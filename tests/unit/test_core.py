@@ -44,6 +44,13 @@ class ResponseModel(BaseModel):
     b2: Optional[str] = None
 
 
+class FormResponseModel(BaseModel):
+    q1: int
+    q2: str
+    f1: int
+    f2: Optional[str] = None
+
+
 class QueryModel(BaseModel):
     q1: int
     q2: str = "default"
@@ -86,8 +93,6 @@ validate_test_cases = [
         ValidateParams(
             request_body={"b1": 1.4},
             request_query=ImmutableMultiDict({"q1": 1}),
-            request_form=ImmutableMultiDict({"f1": 1}),
-            form_model=FormModel,
             expected_response_body={"q1": 1, "q2": "default", "b1": 1.4, "b2": None},
             response_model=ResponseModel,
             query_model=QueryModel,
@@ -99,8 +104,6 @@ validate_test_cases = [
         ValidateParams(
             request_body={"b1": 1.4},
             request_query=ImmutableMultiDict({"q1": 1}),
-            request_form=ImmutableMultiDict({"f1": 1}),
-            form_model=FormModel,
             expected_response_body={"q1": 1, "q2": "default", "b1": 1.4},
             response_model=ResponseModel,
             query_model=QueryModel,
@@ -108,6 +111,22 @@ validate_test_cases = [
             exclude_none=True,
         ),
         id="simple valid example with default values, exclude none",
+    ),
+    pytest.param(
+        ValidateParams(
+            request_form=ImmutableMultiDict({"f1": 1}),
+            request_query=ImmutableMultiDict({"q1": 1}),
+            form_model=FormModel,
+            expected_response_body={
+                "q1": 1,
+                "q2": "default",
+                "f1": 1,
+                "f2": None,
+            },
+            response_model=FormResponseModel,
+            query_model=QueryModel,
+        ),
+        id="valid form param",
     ),
     pytest.param(
         ValidateParams(
@@ -299,15 +318,16 @@ class TestValidate:
         mock_request.form = parameters.request_form
 
         def f():
+            form = {}
             body = {}
             query = {}
             if mock_request.form_params:
-                body = mock_request.form_params.model_dump()
+                form = mock_request.form_params.model_dump()
             if mock_request.body_params:
                 body = mock_request.body_params.model_dump()
             if mock_request.query_params:
                 query = mock_request.query_params.model_dump()
-            return parameters.response_model(**body, **query)
+            return parameters.response_model(**form, **body, **query)
 
         response = validate(
             query=parameters.query_model,
@@ -322,6 +342,12 @@ class TestValidate:
         assert response.status_code == parameters.expected_status_code
         assert_matches(parameters.expected_response_body, response.json)
         if 200 <= response.status_code < 300:
+            assert_matches(
+                parameters.request_form,
+                mock_request.form_params.model_dump(
+                    exclude_none=True, exclude_defaults=True
+                ),
+            )
             assert_matches(
                 parameters.request_body,
                 mock_request.body_params.model_dump(
@@ -361,6 +387,12 @@ class TestValidate:
         assert_matches(parameters.expected_response_body, response.json)
         assert response.status_code == parameters.expected_status_code
         if 200 <= response.status_code < 300:
+            assert_matches(
+                parameters.request_form,
+                mock_request.form_params.model_dump(
+                    exclude_none=True, exclude_defaults=True
+                ),
+            )
             assert_matches(
                 parameters.request_body,
                 mock_request.body_params.model_dump(
@@ -537,15 +569,16 @@ class TestValidate:
         mock_request.form = parameters.request_form
 
         def f() -> Any:
+            form = {}
             body = {}
             query = {}
             if mock_request.form_params:
-                body = mock_request.form_params.model_dump()
+                form = mock_request.form_params.model_dump()
             if mock_request.body_params:
                 body = mock_request.body_params.model_dump()
             if mock_request.query_params:
                 query = mock_request.query_params.model_dump()
-            return parameters.response_model(**body, **query)
+            return parameters.response_model(**form, **body, **query)
 
         response = validate(
             query=parameters.query_model,
@@ -560,6 +593,12 @@ class TestValidate:
         assert response.status_code == parameters.expected_status_code
         assert_matches(parameters.expected_response_body, response.json)
         if 200 <= response.status_code < 300:
+            assert_matches(
+                parameters.request_form,
+                mock_request.form_params.model_dump(
+                    exclude_none=True, exclude_defaults=True
+                ),
+            )
             assert_matches(
                 parameters.request_body,
                 mock_request.body_params.model_dump(
